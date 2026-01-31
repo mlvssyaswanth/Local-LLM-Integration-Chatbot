@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recipe Chatbot</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;1,9..40,400&family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="layout">
+    <header class="header">
+      <h1 class="title">Recipe Chatbot</h1>
+      <p class="subtitle">Enter ingredients — get recipe suggestions from your local AI.</p>
+      <div class="api-status" id="api-status">Checking API…</div>
+    </header>
+
+    <main class="main">
+      <div class="chat" id="chat">
+        <div class="message bot" id="welcome">
+          <p>Hi! List ingredients you have (e.g. <em>Egg, Onion</em> or <em>chicken, garlic, rice</em>) and I’ll suggest a recipe from the dataset.</p>
+        </div>
+      </div>
+
+      <form class="form" id="form">
+        <label for="input" class="sr-only">Your message</label>
+        <textarea id="input" name="message" rows="1" placeholder="e.g. Egg, Onion" maxlength="2000" required></textarea>
+        <button type="submit" id="submit" aria-label="Send">Send</button>
+      </form>
+    </main>
+  </div>
+
+  <script>
+    const API_BASE = window.API_BASE_URL || 'http://127.0.0.1:8000';
+    const chatEl = document.getElementById('chat');
+    const formEl = document.getElementById('form');
+    const inputEl = document.getElementById('input');
+    const submitBtn = document.getElementById('submit');
+    const apiStatusEl = document.getElementById('api-status');
+    const welcomeEl = document.getElementById('welcome');
+
+    async function checkApi() {
+      try {
+        const r = await fetch(API_BASE + '/health');
+        const data = await r.json();
+        apiStatusEl.textContent = 'API connected (model: ' + (data.model || 'unknown') + ')';
+        apiStatusEl.classList.remove('error');
+      } catch (e) {
+        apiStatusEl.textContent = 'API unreachable at ' + API_BASE + '. Start the API server first.';
+        apiStatusEl.classList.add('error');
+      }
+    }
+
+    function appendMessage(role, text) {
+      const div = document.createElement('div');
+      div.className = 'message ' + role;
+      const p = document.createElement('p');
+      p.textContent = text;
+      div.appendChild(p);
+      chatEl.appendChild(div);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    function setLoading(loading) {
+      submitBtn.disabled = loading;
+      submitBtn.textContent = loading ? '…' : 'Send';
+    }
+
+    formEl.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const message = inputEl.value.trim();
+      if (!message) return;
+
+      appendMessage('user', message);
+      inputEl.value = '';
+      setLoading(true);
+
+      try {
+        const r = await fetch(API_BASE + '/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: message })
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.detail || r.statusText);
+        appendMessage('bot', data.response || '');
+      } catch (err) {
+        appendMessage('bot', '[Error] ' + (err.message || String(err)));
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    inputEl.addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    });
+
+    checkApi();
+  </script>
+</body>
+</html>
