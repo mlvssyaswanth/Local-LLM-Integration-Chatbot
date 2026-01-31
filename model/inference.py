@@ -4,7 +4,7 @@ import re
 from typing import Any
 
 from dataset.loader import RecipeLoader
-from model.prompt_builder import build_recipe_prompt
+from model.prompt_builder import build_recipe_prompt, format_recipe_for_response
 
 
 def _parse_ingredients_from_message(message: str) -> list[str]:
@@ -53,6 +53,26 @@ class RecipeInferenceEngine:
                 ) from e
             raise RuntimeError(f"Ollama request failed: {e}") from e
 
+    def _fallback_response(
+        self, matching: list[dict[str, Any]], user_message: str
+    ) -> str:
+        """Return a recipe from the dataset when Ollama is unavailable."""
+        if matching:
+            first = matching[0]
+            lines = [
+                f"Based on your ingredients, here's a recipe: **{first.get('name', 'Recipe')}**.",
+                "",
+                format_recipe_for_response(first),
+            ]
+            if len(matching) > 1:
+                others = ", ".join(r.get("name", "?") for r in matching[1:3])
+                lines.append(f"\nYou might also try: {others}.")
+            return "\n".join(lines)
+        return (
+            "No recipes in our dataset match those ingredients. "
+            "Try different ingredients or ask for a general suggestion."
+        )
+
     def suggest_recipe(self, user_message: str) -> str:
         ingredients = _parse_ingredients_from_message(user_message)
         matching = self.loader.find_by_ingredients(
@@ -66,4 +86,7 @@ class RecipeInferenceEngine:
             include_all_recipes=not matching,
             all_recipes=all_recipes,
         )
-        return self._call_ollama(system, user_prompt)
+        try:
+            return self._call_ollama(system, user_prompt)
+        except RuntimeError:
+            return self._fallback_response(matching, user_message)

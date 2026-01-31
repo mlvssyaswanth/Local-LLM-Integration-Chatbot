@@ -13,6 +13,18 @@ def format_recipe_for_prompt(recipe: dict[str, Any]) -> str:
     return f"- **{name}**\n  Ingredients: {', '.join(ingredients)}\n  Instructions: {instructions}"
 
 
+def format_recipe_for_response(recipe: dict[str, Any]) -> str:
+    """Single recipe as plain text for fallback response."""
+    name = recipe.get("name", "Unknown")
+    ingredients = recipe.get("ingredients", [])
+    instructions = recipe.get("instructions", "")
+    return (
+        f"Recipe: {name}\n"
+        f"Ingredients: {', '.join(ingredients)}\n"
+        f"Instructions: {instructions}"
+    )
+
+
 def build_recipe_prompt(
     user_message: str,
     matching_recipes: list[dict[str, Any]],
